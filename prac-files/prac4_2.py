@@ -16,34 +16,15 @@ k_d = 5.0
 
 LENGTH = 15.0   #15 FOR 40CM
 ANGLE = 20.5 #FOR 360
-ANGLEPRECETIMETER = LENGTH / 40.0
-ANGLEPERDEGREE = ANGLE / (2*math.pi)
-
+AnglePerCentimeter = LENGTH / 40.0
+AnglePerRadius = ANGLE / (2*math.pi) 
 left_coefficient = 1.035
 
-
-def rotate(rotation):
-    angle = rotation * ANGLEPERDEGREE
-    interface.increaseMotorAngleReferences(motors, [-left_coefficient * angle, angle])
-    motorAngles = interface.getMotorAngles(motors)
-    initialValues = [motorAngles[0][0], motorAngles[1][0]]
-    while not interface.motorAngleReferencesReached(motors):
-        time.sleep(0.1)
-    #time.sleep(0.1)
-
-def goLine(distance):
-    angle = distance * ANGLEPRECETIMETER
-    interface.increaseMotorAngleReferences(motors, [left_coefficient * angle, angle])
-    motorAngles = interface.getMotorAngles(motors)
-    initialValues = [motorAngles[0][0], motorAngles[1][0]]
-    while not interface.motorAngleReferencesReached(motors):
-        time.sleep(0.1)
-    #time.sleep(0.1)
-
-#Initialization
+#-------------------------------Initialization----------------------------------------
 interface.motorEnable(motors[0])
 interface.motorEnable(motors[1])
 
+#Left motor
 motorParams0 = interface.MotorAngleControllerParameters()
 motorParams0.maxRotationAcceleration = 6
 motorParams0.maxRotationSpeed = 12
@@ -55,6 +36,7 @@ motorParams0.pidParameters.k_p = k_p
 motorParams0.pidParameters.k_i = k_i
 motorParams0.pidParameters.K_d = k_d
 
+#Right motor
 motorParams1 = interface.MotorAngleControllerParameters()
 motorParams1.maxRotationAcceleration = 6.0
 motorParams1.maxRotationSpeed = 12
@@ -66,11 +48,31 @@ motorParams1.pidParameters.k_p = k_p
 motorParams1.pidParameters.k_i = k_i
 motorParams1.pidParameters.K_d = k_d
 
-
 interface.setMotorAngleControllerParameters(motors[0],motorParams0)
 interface.setMotorAngleControllerParameters(motors[1],motorParams1)
 
+
+# -------------------------------------Movement function-------------------------------------
+def rotate(rotation):
+    angle = rotation * AnglePerRadius
+    interface.increaseMotorAngleReferences(motors, [-left_coefficient * angle, angle])
+    motorAngles = interface.getMotorAngles(motors)
+    #initialValues = [motorAngles[0][0], motorAngles[1][0]]
+    while not interface.motorAngleReferencesReached(motors):
+        time.sleep(0.1)
+
+
+def goLine(distance):
+    angle = distance * AnglePerCentimeter
+    interface.increaseMotorAngleReferences(motors, [left_coefficient * angle, angle])
+    motorAngles = interface.getMotorAngles(motors)
+    #initialValues = [motorAngles[0][0], motorAngles[1][0]]
+    while not interface.motorAngleReferencesReached(motors):
+        time.sleep(0.1)
+
 #interface.startLogging("./log2_" + str(k_p) + ".txt"
+
+#----------------------------------------Square test--------------------------------------------
 '''
 goLine(40)
 rotate(90)
@@ -81,10 +83,13 @@ rotate(90)
 goLine(40)
 rotate(90)
 '''
+
+
+#----------------------------------------Web page simulation--------------------------------------
 NOP = 100 #numbef of particle
-SIGMA_E = 1
-SIGMA_F = 0.01
-SIGMA_G = 0.02
+SIGMA_E = 1 # gaussian error in distance angle
+SIGMA_F = 0.01 # gaussian error in straight line moving angle
+SIGMA_G = 0.02 # gaussian error in rotation angle
 D = 150
 
 line1 = (100, 100, 100, 800) # (x0, y0, x1, y1)
