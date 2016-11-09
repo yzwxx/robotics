@@ -75,3 +75,5 @@ rotate(90)
 
 #interface.stopLogging()
 interface.terminate()
+
+# just for test
