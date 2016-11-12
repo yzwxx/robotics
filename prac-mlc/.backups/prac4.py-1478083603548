@@ -1,0 +1,37 @@
+import time
+import sys
+import random
+
+c = 0;
+def getRandomX():
+    return random.randint((c%10)*50, (c%10 + 1)*50)
+
+def getRandomY():
+    return random.randint((c%10)*50, (c%10 + 1)*50)
+
+def getRandomTheta(): 
+    return random.randint(0, 360)
+
+nOP = 100 #numbef of particle
+
+line1 = (10, 10, 10, 800) # (x0, y0, x1, y1)
+line2 = (10, 10, 800, 10)  # (x0, y0, x1, y1)
+
+
+print "drawLine:" + str(line1)
+print "drawLine:" + str(line2)
+
+
+
+P = [] #particle
+for i in range(0,nOP):
+    elem = [0,0,0]    
+    P.append(elem)
+
+while True:
+    # Create a list of particles to draw. This list should be filled by tuples (x, y, theta).
+    particles = [(getRandomX(), getRandomY(), getRandomTheta()) for i in range(numberOfParticles)]
+    print "drawParticles:" + str(particles)
+    
+    c += 1;
+    time.sleep(0.25)

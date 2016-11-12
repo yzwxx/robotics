@@ -1,0 +1,439 @@
+#!/usr/bin/env python 
+
+# Some suitable functions and data structures for drawing a map and particles
+
+import time
+import sys
+import random
+import math
+import brickpi
+import time
+
+
+SIGMA_E = 1
+SIGMA_F = 0.15
+SIGMA_G = 0.1
+SENSOR_DEV = 1.2
+SONAR_THRESHOLD = 10
+LIKELIHOOD_CONST = 0.01
+
+port2 = 2
+
+#ROBOTICS
+interface = brickpi.Interface()
+interface.initialize()
+motors = [0, 1]
+
+k_p = 480.0
+k_i = 400.0
+k_d = 5.0
+
+LENGTH = 15.0   #15 FOR 40CM
+ANGLE = 20.5 #FOR 360
+AnglePerCentimeter = LENGTH / 40.0
+AnglePerRadius = ANGLE / (2*math.pi) 
+left_coefficient = 1.035
+D = 150
+
+#-------------------------------Initialization----------------------------------------
+interface.sensorEnable(port2, brickpi.SensorType.SENSOR_ULTRASONIC);
+
+interface.motorEnable(motors[0])
+interface.motorEnable(motors[1])
+
+#Left motor
+motorParams0 = interface.MotorAngleControllerParameters()
+motorParams0.maxRotationAcceleration = 6
+motorParams0.maxRotationSpeed = 12
+motorParams0.feedForwardGain = 255/20.0
+motorParams0.minPWM = 18.0
+motorParams0.pidParameters.minOutput = -255
+motorParams0.pidParameters.maxOutput = 255
+motorParams0.pidParameters.k_p = k_p
+motorParams0.pidParameters.k_i = k_i
+motorParams0.pidParameters.K_d = k_d
+
+#Right motor
+motorParams1 = interface.MotorAngleControllerParameters()
+motorParams1.maxRotationAcceleration = 6.0
+motorParams1.maxRotationSpeed = 12
+motorParams1.feedForwardGain = 255/20.0
+motorParams1.minPWM = 18.0
+motorParams1.pidParameters.minOutput = -255
+motorParams1.pidParameters.maxOutput = 255
+motorParams1.pidParameters.k_p = k_p
+motorParams1.pidParameters.k_i = k_i
+motorParams1.pidParameters.K_d = k_d
+
+interface.setMotorAngleControllerParameters(motors[0],motorParams0)
+interface.setMotorAngleControllerParameters(motors[1],motorParams1)
+
+
+# -------------------------------------Movement function-------------------------------------
+def rotate(rotation):
+    angle = rotation * AnglePerRadius
+    interface.increaseMotorAngleReferences(motors, [-left_coefficient * angle, angle])
+    motorAngles = interface.getMotorAngles(motors)
+    #initialValues = [motorAngles[0][0], motorAngles[1][0]]
+    while not interface.motorAngleReferencesReached(motors):
+        time.sleep(0.1)
+
+
+def goLine(distance):
+    angle = distance * AnglePerCentimeter
+    interface.increaseMotorAngleReferences(motors, [left_coefficient * angle, angle])
+    motorAngles = interface.getMotorAngles(motors)
+    #initialValues = [motorAngles[0][0], motorAngles[1][0]]
+    while not interface.motorAngleReferencesReached(motors):
+        time.sleep(0.1)
+
+#interface.startLogging("./log2_" + str(k_p) + ".txt"
+#----------------------------------------Sensor Value-------------------------------------------
+
+def getSensorValue():
+    sonarValues = []
+    
+    for i in range(20):
+        usReading2 = interface.getSensorValue(port2)
+        sonarValues.append(usReading2[0])   
+        time.sleep(0.05)    
+    sonarValues.sort() 
+    median = sonarValues[10]
+    return (median - 2.5)
+
+#----------------------------------------Square test--------------------------------------------
+
+'''
+goLine(40)
+rotate(90/(2*math.pi))
+goLine(40)
+rotate(90/(2*math.pi))
+goLine(40)
+rotate(90/(2*math.pi))
+goLine(40)
+rotate(90/(2*math.pi))
+'''
+
+
+def generate_points(n):
+    data = []
+    for i in range(n):
+        data.append([0.0,0.0,0.0,1.0/n])
+    return data
+
+def calculate_likelihood(x, y, theta, z):
+    #print x, y, theta
+    #find closest distance to wall
+    min_dist = -1
+    for wall in mymap.walls:
+        #print wall
+        if ((wall[3] - wall[1]) * math.cos(theta) - (wall[2] - wall[0]) * math.sin(theta)) == 0:
+            #print "the wall is parallel to the robot"
+            continue #the wall is parallel to the robot
+            
+        m = ( (wall[3] - wall[1])*(wall[0] - x) - (wall[2] - wall[0])*(wall[1] - y) ) / ( (wall[3] - wall[1]) * math.cos(theta) - (wall[2] - wall[0]) * math.sin(theta))
+        #print m
+        if m < 0:
+            #print "the wall is behind"
+            continue  #wall is behind robot
+        intersection_x = x + m * math.cos(theta)
+        intersection_y = y + m * math.sin(theta)
+        #------------------------------------------------------------------------
+        if (wall[0] > wall[2]):
+            if intersection_x > wall[0] or intersection_x < wall[2]:
+                #print "not intersecting the wall"
+                continue    #robot does not intersect wall
+        if (wall[0] < wall[2]):
+            if intersection_x < wall[0] or intersection_x > wall[2]:
+                #print "not intersecting the wall"
+                continue    #robot does not intersect wall
+        if (wall[0] == wall[2]):
+            if (wall[1] > wall[3]):
+                if intersection_y > wall[1] or intersection_y < wall[3]:
+                    #print "not intersecting the wall"
+                    continue    #robot does not intersect wall
+            if (wall[1] < wall[3]):
+                if intersection_y < wall[1] or intersection_y > wall[3]:
+                    #print "not intersecting the wall"
+                    continue    #robot does not intersect wall        
+        #------------------------------------------------------------------------
+        #print "min dist", min_dist
+        #print "m", m
+        
+        if (min_dist == -1):
+            min_dist = m
+        elif (min_dist > m):
+            min_dist = m
+        
+            
+    prob = math.exp( -(z - m)*(z - m) / (2 * SENSOR_DEV * SENSOR_DEV)) + LIKELIHOOD_CONST
+    return prob    
+    
+
+# Simple Particles set
+class Particles:
+    def __init__(self):
+        self.n = 150;    
+        self.data = generate_points(self.n)
+
+    def updateStraightLine(self, dist):
+        for i in range(self.n):
+            self.data[i][0] += (dist+random.gauss(0, SIGMA_E))*math.cos(self.data[i][2])
+            self.data[i][1] += (dist+random.gauss(0, SIGMA_E))*math.sin(self.data[i][2])
+            self.data[i][2] += random.gauss(0,SIGMA_F)
+    
+    def updateWeights(self, z):
+        for i in range(self.n):
+            self.data[i][3] = self.data[i][3] * calculate_likelihood(self.data[i][0], self.data[i][1], self.data[i][2], z)
+            
+    def updateRotation(self, angleDiff):
+        for i in range(self.n):
+            self.data[i][2] += angleDiff + random.gauss(0,SIGMA_G)
+    
+    def getX(self, point):
+        return point[0]
+
+    def getY(self, point):
+        return point[1]
+
+    def getTheta(self, point):
+        return point[2]
+
+    def getWeight(self, point):
+        return point[3]
+
+    def draw(self):
+        canvas.drawParticles(self.data);
+
+    def normalizeData(self):
+        sum = 0.0
+        for i in range(self.n):
+            sum += self.data[i][3]
+        for i in range(self.n):
+            self.data[i][3] /= sum        
+    
+    def copyPoint(self, point):
+        return [point[0], point[1], point[2], 1.0/self.n]
+
+    def regenerateParticles(self):
+        sum = 0.0
+        cumDist = []
+        #create cumulative distribution list
+        for i in range(self.n):
+            sum += self.data[i][3]
+            cumDist.append(sum)
+        #generate new data
+        #print "cummulative distribution"
+        #print cumDist
+        newData = []
+        for i in range(self.n):
+            randomNum = random.random()
+            #print "random number"
+            #print randomNum
+            pos = (-1)
+            for j in range(self.n):
+                if cumDist[j] > randomNum:
+                    pos = j
+                    break
+            if pos == -1:
+                pos = n-1
+            newData.append(self.copyPoint(self.data[pos]))
+        print newData
+        self.data = newData
+
+    def computeAvg(self):
+        sum = [84.0, 30.0, 0.0, 0.0]
+        for i in range(self.n):
+            sum[0] += self.data[i][0]*self.data[i][3]
+            sum[1] += self.data[i][1]*self.data[i][3]
+            sum[2] += self.data[i][2]*self.data[i][3]
+        return sum
+    
+    def computeAvgDot(self):
+        point = self.computeAvg()
+        return Dot(point[0],point[1], point[2], point[3])
+
+
+particles = Particles()
+print particles.data
+
+class Dot(object):
+    def __init__(self, x,y,theta,weight):
+        self.x = x
+        self.y = y
+        self.theta = theta
+        self.w = weight
+
+# ---------------------------------Waypoint navigation-----------------------------------
+def compute_coord(x, y, wx, wy):
+    dx = wx - x
+    dy = wy - y
+    alpha = math.atan2(dy, dx)  #in radius
+    dist = math.sqrt(dx*dx + dy*dy)
+    return (alpha, dist)
+
+
+def compute_angle_turn(curr_angle, dest_angle):
+    #print "cur:"+str(curr_angle/(math.pi)*180)
+    #print "des:"+str(dest_angle/(math.pi)*180)
+    angle_diff = dest_angle - curr_angle
+    # tricks to reduce the turing anle
+    if angle_diff > math.pi:
+        angle_diff = -(math.pi*2 - angle_diff)
+    if angle_diff < -math.pi:
+        angle_diff = math.pi*2 + angle_diff
+    return angle_diff, dest_angle
+
+
+def navigateToWaypoint(wx,wy):
+        #inputStr = raw_input("input destination:  ")
+        #if inputStr == "exit":
+        #   print "mission completed"
+        #   return 
+        origin = particles.computeAvgDot()
+        print "ORIGIN"
+        print origin.x
+        print origin.y
+        print origin.theta
+        
+        #wx,wy = inputStr.split(',')
+        #wx = float(wx)
+        #wy = float(wy)
+        dist,angle_diff,destAngle = navigateToWaypointAux(wx, wy, origin)
+        z = getSensorValue()
+
+        #print "curr",origin.theta
+        #print "diff",angle_diff
+        #print "destination",destAngle
+        particles.updateRotation(angle_diff)
+        
+        particles.updateStraightLine(dist)
+        
+        if (z < 2000):
+            particles.updateWeights(z)
+            #print "after weight update:"
+            #print particles.data
+            particles.normalizeData()
+            #print "after normalization:"
+            #print particles.data
+            #print "after regenerating:"
+            particles.regenerateParticles()
+    
+def navigateToWaypointAux(wx, wy, origin):
+    curr_x, curr_y, curr_theta = origin.x,origin.y,origin.theta
+    (alpha, dist) = compute_coord(curr_x, curr_y, wx, wy)
+    angle_diff, dest_angle = compute_angle_turn(curr_theta, alpha)
+    rotate(-angle_diff)
+    goLine(dist) 
+    return dist,angle_diff,dest_angle
+
+#webSimulation()    
+#origin = Dot(0,0,0,1.0)
+#navigateToWaypoint(origin)
+#interface.stopLogging()
+
+
+import time
+import random
+import math
+
+
+# Functions to generate some dummy particles data:
+def calcX():
+    return random.gauss(80,3) + 70*(math.sin(t)); # in cm
+
+def calcY():
+    return random.gauss(70,3) + 60*(math.sin(2*t)); # in cm
+
+def calcW():
+    return random.random();
+
+def calcTheta():
+    return random.randint(0,360);
+
+# A Canvas class for drawing a map and particles:
+#     - it takes care of a proper scaling and coordinate transformation between
+#      the map frame of reference (in cm) and the display (in pixels)
+class Canvas:
+    def __init__(self,map_size=210):
+        self.map_size    = map_size;    # in cm;
+        self.canvas_size = 768;         # in pixels;
+        self.margin      = 0.05*map_size;
+        self.scale       = self.canvas_size/(map_size+2*self.margin);
+
+    def drawLine(self,line):
+        x1 = self.__screenX(line[0]);
+        y1 = self.__screenY(line[1]);
+        x2 = self.__screenX(line[2]);
+        y2 = self.__screenY(line[3]);
+        print "drawLine:" + str((x1,y1,x2,y2))
+
+    def drawParticles(self,data):
+        display = [(self.__screenX(d[0]),self.__screenY(d[1])) + d[2:] for d in data];
+        print "drawParticles:" + str(display);
+
+    def __screenX(self,x):
+        return (x + self.margin)*self.scale #ol
+
+    def __screenY(self,y):
+        return (self.map_size + self.margin - y)*self.scale
+
+# A Map class containing walls
+class Map:
+    def __init__(self):
+        self.walls = [];
+
+    def add_wall(self,wall):
+        self.walls.append(wall);
+
+    def clear(self):
+        self.walls = [];
+
+    def draw(self):
+        for wall in self.walls:
+            canvas.drawLine(wall);
+    
+    #def find_closest_wall(particle_x,particle_y,particle_theta):
+    #for wall in self.walls:   
+
+canvas = Canvas();
+
+mymap = Map();
+# Definitions of walls
+# a: O to A
+# b: A to B
+# c: C to D
+# d: D to E
+# e: E to F
+# f: F to G
+# g: G to H
+# h: H to O
+mymap.add_wall((0,0,0,168));        # a
+mymap.add_wall((0,168,84,168));     # b
+mymap.add_wall((84,126,84,210));    # c
+mymap.add_wall((84,210,168,210));   # d
+mymap.add_wall((168,210,168,84));   # e
+mymap.add_wall((168,84,210,84));    # f
+mymap.add_wall((210,84,210,0));     # g
+mymap.add_wall((210,0,0,0));        # h
+mymap.draw();
+
+
+navigateToWaypoint(180,30)
+navigateToWaypoint(180,54)
+navigateToWaypoint(138,54)
+navigateToWaypoint(138,168)
+navigateToWaypoint(114,168)
+navigateToWaypoint(114,84)
+navigateToWaypoint(84,84)
+navigateToWaypoint(84,30)
+
+
+t = 0;
+#while True:
+#    particles.update();
+#    particles.draw();
+#    t += 0.05;
+#    time.sleep(0.05);
+
+interface.terminate()

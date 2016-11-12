@@ -1,0 +1,43 @@
+import brickpi
+import time
+
+interface=brickpi.Interface()
+interface.initialize()
+
+SONAR_THRESHOLD = 20
+
+#port0 = 0 # port which ultrasoic sensor is plugged in to
+#port1 = 1
+port2 = 2
+
+#interface.sensorEnable(port, brickpi.SensorType.SENSOR_ULTRASONIC);
+#interface.sensorEnable(port, brickpi.SensorType.SENSOR_TOUCH);
+#interface.sensorEnable(port0, brickpi.SensorType.SENSOR_TOUCH);
+#interface.sensorEnable(port1, brickpi.SensorType.SENSOR_TOUCH);
+interface.sensorEnable(port2, brickpi.SensorType.SENSOR_ULTRASONIC);
+
+
+sonarValues = []
+#for i in range(0,100):
+for i in range(20):
+    sonarValues = []
+
+    usReading2 = interface.getSensorValue(port2)
+    sonarValues.append(usReading2)
+    
+    print usReading2    
+    
+    time.sleep(0.1)
+    
+print sonarValues    
+sonarValues.sort()
+print sonarValues 
+median = sonarValues[10]
+
+newSonarValues = []
+#for val in sonarValues:
+ #   if 
+    
+
+
+interface.terminate()

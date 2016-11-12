@@ -1,0 +1,100 @@
+import time
+import random
+import math
+from version3 import *
+class Map:
+    def __init__(self):
+        self.walls = [];
+        self.loc = [];
+
+    def add_wall(self,wall):
+        self.walls.append(wall);
+
+    def add_loc(self,loc):
+        self.walls.append(loc);
+
+    def clear(self):
+        self.walls = [];
+
+    
+
+                       
+mymap = Map();
+# Definitions of walls
+# a: O to A
+# b: A to B
+# c: C to D
+# d: D to E
+# e: E to F
+# f: F to G
+# g: G to H
+# h: H to O
+mymap.add_wall((0,0,0,168));        # a
+mymap.add_wall((0,168,84,168));     # b
+mymap.add_wall((84,126,84,210));    # c
+mymap.add_wall((84,210,168,210));   # d
+mymap.add_wall((168,210,168,84));   # e
+mymap.add_wall((168,84,210,84));    # f
+mymap.add_wall((210,84,210,0));     # g
+mymap.add_wall((210,0,0,0));        # h
+
+mymap.add_loc((84,30));        
+mymap.add_loc((180,30));        
+mymap.add_loc((180,54));        
+mymap.add_loc((138,54));        
+mymap.add_loc((138,168));        
+mymap.add_loc((114,168));        
+mymap.add_loc((114,84));        
+mymap.add_loc((84,84));        
+mymap.add_loc((84,30));        
+
+
+          
+            
+def calculate_likelihood(x, y, theta, z):
+    m = -1
+    for i in range(8):
+        Ax = mymap.walls[i][0]
+        Ay = mymap.walls[i][1]
+        Bx = mymap.walls[i][2]
+        By = mymap.walls[i][3]
+        d = ((By-Ay)*(Ax-x)-(Bx-Ax)*(Ay-y))/((By-Ay)*math.cos(theta)-(Bx-Ax)*math.sin(theta)+0.00000000001)
+        if d>0:
+            x_inwall = x+d*math.cos(theta)
+            y_inwall = y+d*math.sin(theta)
+            if (x_inwall-Ax)*(x_inwall-Bx)+(y_inwall-Ay)*(y_inwall-By)<=0 and (m<0 or d<m):
+                m = d
+    sigma_s = 1 # standard deviation for sensor in cm    
+    return math.exp(-(z-m)**2/(2*sigma_s**2))
+
+NOP = 100 #numbef of particle
+SIGMA_E = 1 # gaussian error in distance angle
+SIGMA_F = 0.01 # gaussian error in straight line moving angle
+SIGMA_G = 0.02 # gaussian error in rotation angle
+
+
+print mymap.loc[0][0]
+'''
+P = [] #particle
+for i in range(NOP):
+    P.append(Dot(mymap.loc[0][0],mymap.loc[0][1],0,1.0/NOP))  # just take the same weight
+
+    
+    
+    # divide each edge of the square into 4 pieces and run one at a time then sleep for a while
+
+
+for i in range(1,9):
+    curr = get_average_point(P)
+    navigateToWaypointAux(mymap.loc[i][0], mymap.loc[i][0], curr)
+    P[k].x += (D+random.gauss(0, SIGMA_E))*math.cos(P[k].theta)
+    P[k].y += (D+random.gauss(0, SIGMA_E))*math.sin(P[k].theta)
+    P[k].theta += random.gauss(0,SIGMA_F)
+                
+        # Create a list of particles to draw. This list should be filled by tuples (x, y, theta).
+ 
+        
+'''
+
+            
+    

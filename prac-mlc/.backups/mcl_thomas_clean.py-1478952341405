@@ -1,0 +1,121 @@
+import time
+import numpy
+import sys
+import random
+import math
+import brickpi
+import particleDataStructures as pds
+
+    
+# ---------------------------------Sonar Likelihood and Measurement Update--------------------------------
+def generateMap():
+    canvas = pds.Canvas()
+    map = Map();
+        
+    # Definitions of walls
+    # a: O to A
+    # b: A to B
+    # c: C to D
+    # d: D to E
+    # e: E to F
+    # f: F to G
+    # g: G to H
+    # h: H to O
+    map.add_wall((0,0,0,168));        # a
+    map.add_wall((0,168,84,168));     # b
+    map.add_wall((84,126,84,210));    # c
+    map.add_wall((84,210,168,210));   # d
+    map.add_wall((168,210,168,84));   # e
+    map.add_wall((168,84,210,84));    # f
+    map.add_wall((210,84,210,0));     # g
+    map.add_wall((210,0,0,0));        # h
+    map.draw();
+    
+    return map
+
+
+def expected_depth(Ax, Ay, Bx, By, x, y, theta):
+    m= ((By-Ay)*(Ax-x) - (Bx-Ax)*(Ay-y)) / ((By-Ay)*math.cos(theta)-(Bx-Ax)*math.sin(theta));
+    return 1.0              
+
+
+def sonar_angle(Ax, Ay, Bx, By, theta):
+    walldistance = math.sqrt((Ay-By)**2 + (Bx-Ax)**2)    
+    beta = math.acos((math.cos(theta)*(Ay-By) + math.sin(theta)*(Bx-Ax))/ walldistance)    
+    return beta
+
+
+def sonar_coordinate(x, y, theta, m):
+    
+    x0 = x + m*math.cos(theta)
+    y0 = y + m*math.sin(theta)
+    
+    return x0,y0
+
+
+def check_sonar_coordinate (Ax, Ay, Bx, By, x0, y0):
+    
+    gradA = (Ax - x0) / (Ay - y0)
+    gradB = (x0 - Bx) / (y0 - By)
+    
+    if gradA == gradB:
+        return True
+    else:
+        return False
+    
+    
+def calculate_likelihood(x, y, theta, z, sigma_s, K):
+    
+    
+    map =generateMap()
+    
+    print(map.walls)
+    
+    wall_dist =dict()
+    
+    for wall in maps.walls:
+        Ax = wall[0]
+        Ay = wall[1]
+        Bx = wall[2]
+        By = wall[3]
+        m = expected_depth(Ax, Ay, Bx, By, x, y, theta)
+        x0, y0 = sonar_coordinate(x,y,theta, m)
+        
+        if (check_sonar_coordinate(Ax, Ay, Bx, By, x, y, x0, y0) and m >=0):
+            wall_dist [m] = wall
+            
+    m = min(d, key=d.get)
+    actualWall = wall_dist[m]
+    
+    Ax = wall[0]
+    Ay = wall[1]
+    Bx = wall[2]
+    By = wall[3]
+    
+            
+    likelihood = K + math.exp(-0.5/(sigma_s**2)*(z-m)**2)        
+    
+    
+    return likelihood
+    
+
+
+ 
+
+#calculate_likelihood(1.0, 1.0, 0.5, 1.0, 0.1, 0.0001)  
+#expected_depth(float Ax, float Ay, float Bx, float By, float x, float y, float theta)
+
+test =expected_depth(100.0, 150.0, 80.0, 120.0, 50.0, 50.0, 0.5)
+
+print(test)
+#webSimulation()    
+#origin = Dot(0,0,0,1.0)
+#navigateToWaypoint(origin)
+#interface.stopLogging()
+#interface.terminate()
+    
+
+        
+    
+    
+    
