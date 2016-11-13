@@ -52,9 +52,10 @@ class Canvas:
 class Particles:
     def __init__(self,x,y,theta):
         self.n = 50;     # how many particles we use
-        self.data = [];  # intialize to original
+        self.data = [];  # initialize all particles to the same origin
         for i in range(self.n):
             self.data.append(Dot(x,y,theta,1.0/self.n))
+
     # spread out after going straight
     def updateStraight(self,dist):
         for i in range(self.n):
@@ -65,33 +66,54 @@ class Particles:
     # spread out after rotation
     def updateRotate(self,rotAngle):
         for i in range(self.n):
-            self.data[i].theta += random.gauss(0,SIGMA_G)
+            self.data[i].theta += rotAngle + random.gauss(0,SIGMA_G)
     
+    # from differently-weighted particles to evenly-weighted particles
     def resampleParticles(self):
         sum = 0.0
-        
-        cumdist = []
-        newdata = []
+        cumProb = [] # cumulative probability distribution
+        newData = []
         for i in range(self.n):
             sum += self.data[i].weight
-            cumdist.append(sum)
+            cumProb.append(sum)
                
         for i in range(self.n):
-            u = random.random()
+            u = random.random() 
+            pos = -1
             for j in range(self.n):
-                if u < cumdist[j]:
-                    index = j
+                if u < cumProb[j]:
+                    pos = j
                     break
-            newdata.append(self.data[index])
-        self.data = newdata
+            if (pos == -1):
+                pos = self.n - 1
+            newData.append(self.data[pos])
+        self.data = newData
         return True
                 
-   
-    
+    def updateWeights(self,sonarDist):
+        # update weights of each particles(unnormalized)
+        for i in range(self.n):
+            self.data[i].weight = self.data[i].weight*calculate_likelihood(self.data[i].x,self.data[i].y,self.data[i].theta,sonarDist)
+
+    def normalizeWeights(self):
+        sum = 0.0
+        for i in range(self.n):
+            sum += self.data[i].weight
+        for i in range(self.n):
+            self.data[i].weight = self.data[i].weight/sum
+
+    def calculateMean(self):
+        # given the current particles distribution to calculate the mean
+        #mean = Dot(84.0, 30.0, 0.0, 1/self.n)
+        mean = Dot(0.0, 0.0, 0.0, 1/self.n)
+        for i in range(self.n):
+            mean.x += self.data[i].x*self.data[i].weight
+            mean.y += self.data[i].y*self.data[i].weight
+            mean.theta += self.data[i].theta*self.data[i].weight
+        return mean
+
     def draw(self):
         canvas.drawParticles(self.data);
-
-canvas = Canvas();    # global canvas we are going to draw on
 
 
 # A Map class containing walls
@@ -111,80 +133,8 @@ class Map:
             canvas.drawLine(wall);
             
 
-mymap = Map();
-# Definitions of walls
-# a: O to A
-# b: A to B
-# c: C to D
-# d: D to E
-# e: E to F
-# f: F to G
-# g: G to H
-# h: H to O
-mymap.add_wall((0,0,0,168));        # a
-mymap.add_wall((0,168,84,168));     # b
-mymap.add_wall((84,126,84,210));    # c
-mymap.add_wall((84,210,168,210));   # d
-mymap.add_wall((168,210,168,84));   # e
-mymap.add_wall((168,84,210,84));    # f
-mymap.add_wall((210,84,210,0));     # g
-mymap.add_wall((210,0,0,0));        # h
-mymap.draw();
+#---------------------------------------------------main----------------------------------
 
-
-
-
-#---------------------------------------------------main-----------------------------------------------------
-#ROBOTICS
-interface = brickpi.Interface()
-interface.initialize()
-motors = [0, 1]
-
-k_p = 480.0
-k_i = 400.0
-k_d = 5.0
-
-LENGTH = 15.0   #15 FOR 40CM
-ANGLE = 20.5 #FOR 360
-AnglePerCentimeter = LENGTH / 40.0
-AnglePerRadius = ANGLE / (2*math.pi) 
-left_coefficient = 0.9995
-D = 150
-
-#-------------------------------Initialization----------------------------------------
-interface.motorEnable(motors[0])
-interface.motorEnable(motors[1])
-
-#Left motor
-motorParams0 = interface.MotorAngleControllerParameters()
-motorParams0.maxRotationAcceleration = 6
-motorParams0.maxRotationSpeed = 12
-motorParams0.feedForwardGain = 255/20.0
-motorParams0.minPWM = 18.0
-motorParams0.pidParameters.minOutput = -255
-motorParams0.pidParameters.maxOutput = 255
-motorParams0.pidParameters.k_p = k_p
-motorParams0.pidParameters.k_i = k_i
-motorParams0.pidParameters.K_d = k_d
-
-#Right motor
-motorParams1 = interface.MotorAngleControllerParameters()
-motorParams1.maxRotationAcceleration = 6.0
-motorParams1.maxRotationSpeed = 12
-motorParams1.feedForwardGain = 255/20.0
-motorParams1.minPWM = 18.0
-motorParams1.pidParameters.minOutput = -255
-motorParams1.pidParameters.maxOutput = 255
-motorParams1.pidParameters.k_p = k_p
-motorParams1.pidParameters.k_i = k_i
-motorParams1.pidParameters.K_d = k_d
-
-interface.setMotorAngleControllerParameters(motors[0],motorParams0)
-interface.setMotorAngleControllerParameters(motors[1],motorParams1)
-
-#Sonar sensor
-port2 = 2
-interface.sensorEnable(port2, brickpi.SensorType.SENSOR_ULTRASONIC);
 
 
 # -------------------------------------Movement function-------------------------------------
@@ -214,7 +164,7 @@ def readFromSonar():
         result_list.append(interface.getSensorValue(port2)[0])
         #print result_list
         time.sleep(0.1)
-    print sum(result_list)/read_times 
+    #print sum(result_list)/read_times 
     return sum(result_list)/read_times
 
 
@@ -244,6 +194,7 @@ def calculate_likelihood(x,y,theta,z):
     return math.exp(-((z-m)/20)**2/(2*sigma_square)) + K #unnormalised, robust likelihood
         
 #read the sonar output and use bayes theorem to update the weight of each particles
+'''
 def updateWeight(particles,sonarDist):
     sumWeights =0
     for i in range(particles.n):
@@ -252,10 +203,11 @@ def updateWeight(particles,sonarDist):
     # normalization
     for j in range(particles.n):
         particles.data[j].weight = particles.data[j].weight / sumWeights
-        
     return particles
+    '''
 
 # givne all weighted particles to calculate the next mean
+'''
 def updateMean(particles):
     sum_x = 0
     sum_y = 0
@@ -273,6 +225,7 @@ def updateMean(particles):
         particles.data[i].theta = sum_theta/particles.n
         
     print('after meanupdate: ',particles.data[0].x,particles.data[0].y, particles.data[0].theta)
+    '''
 
 
         
@@ -328,7 +281,7 @@ def navigateToWaypointAux(wx, wy, origin):
     angle_diff, dest_angle = compute_angle_turn(curr_theta, alpha)
     print('angle_diff:', angle_diff, 'dest_angle:', dest_angle)
     
-    rotate(-angle_diff)
+    rotate(-angle_diff) #remember the minus
     goLine(dist)
     '''
     origin.x = wx
@@ -336,67 +289,123 @@ def navigateToWaypointAux(wx, wy, origin):
     origin.theta =  dest_angle 
     '''
     #print origin.x,origin.y,origin.theta
-    return dist,dest_angle
+    return dist,angle_diff,dest_angle
+
+#-------------------------------------------Main test-----------------------------------------------
+#ROBOTICS
+interface = brickpi.Interface()
+interface.initialize()
+motors = [0, 1]
+
+k_p = 480.0
+k_i = 400.0
+k_d = 5.0
+
+LENGTH = 15.0   #15 FOR 40CM
+ANGLE = 20.5 #FOR 360
+AnglePerCentimeter = LENGTH / 40.0
+AnglePerRadius = ANGLE / (2*math.pi) 
+left_coefficient = 0.9995
+D = 150
+
+#-------------Robot Initialization-------------
+interface.motorEnable(motors[0])
+interface.motorEnable(motors[1])
+
+#Left motor
+motorParams0 = interface.MotorAngleControllerParameters()
+motorParams0.maxRotationAcceleration = 6
+motorParams0.maxRotationSpeed = 12
+motorParams0.feedForwardGain = 255/20.0
+motorParams0.minPWM = 18.0
+motorParams0.pidParameters.minOutput = -255
+motorParams0.pidParameters.maxOutput = 255
+motorParams0.pidParameters.k_p = k_p
+motorParams0.pidParameters.k_i = k_i
+motorParams0.pidParameters.K_d = k_d
+
+#Right motor
+motorParams1 = interface.MotorAngleControllerParameters()
+motorParams1.maxRotationAcceleration = 6.0
+motorParams1.maxRotationSpeed = 12
+motorParams1.feedForwardGain = 255/20.0
+motorParams1.minPWM = 18.0
+motorParams1.pidParameters.minOutput = -255
+motorParams1.pidParameters.maxOutput = 255
+motorParams1.pidParameters.k_p = k_p
+motorParams1.pidParameters.k_i = k_i
+motorParams1.pidParameters.K_d = k_d
+
+interface.setMotorAngleControllerParameters(motors[0],motorParams0)
+interface.setMotorAngleControllerParameters(motors[1],motorParams1)
+
+#Sonar sensor
+port2 = 2
+interface.sensorEnable(port2, brickpi.SensorType.SENSOR_ULTRASONIC);
+
+canvas = Canvas();    # global canvas we are going to draw on
+mymap = Map();
+# Definitions of walls
+# a: O to A
+# b: A to B
+# c: C to D
+# d: D to E
+# e: E to F
+# f: F to G
+# g: G to H
+# h: H to O
+mymap.add_wall((0,0,0,168));        # a
+mymap.add_wall((0,168,84,168));     # b
+mymap.add_wall((84,126,84,210));    # c
+mymap.add_wall((84,210,168,210));   # d
+mymap.add_wall((168,210,168,84));   # e
+mymap.add_wall((168,84,210,84));    # f
+mymap.add_wall((210,84,210,0));     # g
+mymap.add_wall((210,0,0,0));        # h
+mymap.draw();
 
 
-K = 0.0001
+K = 0.001 # rubust likelihood constant
 numOfWall = 8
 wayPoint = [(84,30),(180,30), (180,54), (138,54), (138,168), (114,168), (114, 84), (84,84), (84,30)]
 
-particles = Particles(wayPoint[0][0], wayPoint[0][1], 0)
+particles = Particles(wayPoint[0][0], wayPoint[0][1], 0) # initialized to [84.0, 30.0, 0.0]
 
-tol  = 5.0
-for (Wx,Wy) in wayPoint:
-    diff = math.sqrt((Wx - particles.data[0].x)**2 + (Wy- particles.data[0].y)**2)
-    
+tol  = 5.0 # tolerance of deviation
+for Wx,Wy in wayPoint:
+    diff = math.sqrt((Wx - particles.calculateMean().x)**2 + (Wy- particles.calculateMean().y)**2)
+    print 'diff to'+str(Wx)+','+str(Wy),diff
+
+
     while diff > tol:
     #for k in range(0,50):
-        origin = particles.data[0]
-        distToGo,angleToGo = navigateToWaypointAux(Wx,Wy,origin)
+        origin = particles.calculateMean()
+        print "origin",origin.x,origin.y,origin.theata
+        distToGo,angleToGo,dest_angle = navigateToWaypointAux(Wx,Wy,origin)
         print('disttogo:', distToGo, 'angleToGo:' , angleToGo)
         particles.updateRotate(angleToGo)
         particles.updateStraight(distToGo)
         sonarDist = readFromSonar()
         
+        '''
         for i in range(particles.n):
             updateWeight(particles,sonarDist)
             updateMean(particles)
-        print 'before resampling: ', particles.data[0].x,particles.data[0].y       
-        particles.resampleParticles()
-            
-        print ('inner loop ended')
-        print 'after resampling: ',particles.data[0].x,particles.data[0].y
-        diff = math.sqrt((Wx - particles.data[0].x)**2 + (Wy- particles.data[0].y)**2)
+            '''
+
+        if sonarDist :
+            particles.updateWeights(sonarDist)
+            particles.normalizeWeights()
+            print 'before resampling: ', particles.data[0].x,particles.data[0].y       
+            particles.resampleParticles()
+            print 'after resampling: ',particles.data[0].x,particles.data[0].y
+
+        
+        diff = math.sqrt((Wx - particles.calculateMean().x)**2 + (Wy - particles.calculateMean().y)**2)
         print 'diff: ',diff
         
         
     
-    
-#pl.draw()
-#print readFromSonar()
-# test the particles
-'''
-for i in range(10):
-    pl.updateStraight(10)
-    pl.updateRotate(10)
-    pl.draw()
-    time.sleep(0.1)     
-    '''
-
-#for i in range(43):
-    #print calculate_likelihood(168,1,0,i)
-#print calculate_likelihood(210,0,0,0)
-'''
-goLine(120)
-rotate(math.pi/2)
-goLine(120)
-rotate(math.pi/2)
-goLine(120)
-rotate(math.pi/2)
-goLine(120)
-rotate(math.pi/2)
-interface.terminate()
-    '''
 
     
     
