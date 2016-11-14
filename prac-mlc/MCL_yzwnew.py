@@ -388,7 +388,9 @@ for Wx,Wy in wayPoint:
         distToGo,angleToGo,dest_angle = navigateToWaypointAux(Wx,Wy,origin)
         print('disttogo:', distToGo, 'angleToGo:' , angleToGo)
         particles.updateRotate(angleToGo)
+        particles.draw()
         particles.updateStraight(distToGo)
+        particles.draw()
         sonarDist = readFromSonar()
         
         '''
@@ -400,9 +402,11 @@ for Wx,Wy in wayPoint:
         if sonarDist :
             particles.updateWeights(sonarDist)
             particles.normalizeWeights()
+            
             print 'before resampling: ', particles.calculateMean().x,particles.calculateMean().y       
             particles.resampleParticles()
             print 'after resampling: ',particles.calculateMean().x,particles.calculateMean().y
+            particles.draw()
 
         
         diff = math.sqrt((Wx - particles.calculateMean().x)**2 + (Wy - particles.calculateMean().y)**2)
