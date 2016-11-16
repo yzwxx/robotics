@@ -51,7 +51,7 @@ class Canvas:
 # Simple Particles set
 class Particles:
     def __init__(self,x,y,theta):
-        self.n = 50;     # how many particles we use
+        self.n = 100;     # how many particles we use
         self.data = [];  # initialize all particles to the same origin
         for i in range(self.n):
             self.data.append(Dot(x,y,theta,1.0/self.n))
@@ -75,7 +75,7 @@ class Particles:
     def resampleParticles(self):
         sum = 0.0
         cumProb = [] # cumulative probability distribution
-        newData = self.data
+        newData = [] 
         for i in range(self.n):
             sum += self.data[i].weight
             cumProb.append(sum)
@@ -371,7 +371,7 @@ mymap.draw();
 K = 0.001 # rubust likelihood constant
 sigma = 3
 numOfWall = 8
-wayPoint = [(84,30),(180,30), (180,54), (138,54),(138,168), (114,168), (114, 84), (84,84), (84,30)]
+wayPoint = [(84,30),(120,30),(150,30),(180,30), (180,54), (138,54),(138,90),(138,130),(138,168), (114,168), (114,120),(114, 84), (84,84), (84,30)]
 
 particles = Particles(wayPoint[0][0], wayPoint[0][1], 0) # initialized to [84.0, 30.0, 0.0]
 
