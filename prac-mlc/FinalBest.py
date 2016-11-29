@@ -838,7 +838,7 @@ def rotateSonar(threshold,currentParticles):
             new_x = curr_x + objDistance*math.cos(resultAngle[i])
             new_y = curr_y + objDistance*math.sin(resultAngle[i])
             
-            distToWallThreshold = 10
+            distToWallThreshold = 15
             if isObject(new_x,new_y,distToWallThreshold):
                 resultAngle_object.append(resultAngle[i])
                 resultDis_object.append(resultDistance[i])
@@ -915,9 +915,9 @@ def isObject(x,y,distToWallThreshold):
 
 # Set way points for each sector to detect object
 origin = (84,30)
-sectorA = [(126, 42+5*0), (168,42+5*0)]
-sectorB = [(126-5*0,74),(126-5*0,106), (126-5*0,136), (126-5*0, 168)]
-sectorC = [(126-5*0,106),(42-5*0,106), (42-5*0, 136)]
+sectorA = [(126, 42), (168,42)]
+sectorB = [(126,74),(126,106), (126,136), (126, 168)]
+sectorC = [(126,90),(42,90), (42, 136)]
 sectorD = [(84, 30)]
 sector = [sectorA, sectorB, sectorC, sectorD]
 
